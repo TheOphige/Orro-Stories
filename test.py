@@ -552,3 +552,85 @@ if uploaded_file is not None:
 
 # if __name__ == '__main__':
 #     main()
+
+
+
+
+
+# from dotenv import find_dotenv, load_dotenv
+# import os
+# import requests
+# import cloudinary
+# import cloudinary.uploader
+# import io
+# import time
+
+# load_dotenv(find_dotenv())
+
+# # Retrieve API keys from .env
+# HUGGINGFACEHUB_API_TOKEN = os.getenv("HUGGINGFACEHUB_API_TOKEN")
+# CLOUDINARY_NAME = os.getenv("CLOUDINARY_NAME")
+# CLOUDINARY_API_KEY = os.getenv("CLOUDINARY_API_KEY")
+# CLOUDINARY_API_SECRET = os.getenv("CLOUDINARY_API_SECRET")
+
+# def text2speech(message, max_retries=5, retry_delay=10):
+#     # Initialize Cloudinary
+#     cloudinary.config(
+#         cloud_name=CLOUDINARY_NAME,
+#         api_key=CLOUDINARY_API_KEY,
+#         api_secret=CLOUDINARY_API_SECRET
+#     )
+
+#     API_URL = "https://api-inference.huggingface.co/models/facebook/fastspeech2-en-ljspeech"
+#     headers = {"Authorization": f"Bearer {HUGGINGFACEHUB_API_TOKEN}"}
+#     payloads = {"inputs": message}
+
+#     retries = 0
+#     while retries < max_retries:
+#         response = requests.post(API_URL, headers=headers, json=payloads)
+
+#         if response.status_code == 200:
+#             content_type = response.headers.get('Content-Type')
+#             print(f"Content-Type: {content_type}")
+
+#             if 'audio/flac' in content_type:
+#                 # Prepare the audio file for uploading
+#                 audio_data = io.BytesIO(response.content)
+#                 audio_data.seek(0)  # Reset file pointer to the start
+                
+#                 # Upload to Cloudinary with the proper resource type
+#                 upload_response = cloudinary.uploader.upload(
+#                     audio_data,
+#                     resource_type='raw',  # 'raw' should be used for generic files like audio
+#                     public_id="generated_audio",
+#                     format="flac"  # Ensuring it's uploaded as an audio file
+#                 )
+                
+#                 # Retrieve the URL for the uploaded audio
+#                 audio_url = upload_response.get('url')
+#                 print("Audio file uploaded successfully.")
+#                 return audio_url
+
+#         elif response.status_code == 503:
+#             # Model is loading, wait for the estimated time
+#             response_data = response.json()
+#             estimated_time = response_data.get("estimated_time", retry_delay)
+#             st.info(f"Model is loading. Retrying in {estimated_time} seconds...")
+#             time.sleep(estimated_time)
+#             retries += 1
+
+#         elif response.status_code == 500 and 'Model too busy' in response.text:
+#             st.info(f"Model too busy. Retrying in {retry_delay} seconds... ({retries+1}/{max_retries})")
+#             retries += 1
+#             time.sleep(retry_delay)
+        
+#         else:
+#             st.error(f"Error: {response.status_code} - {response.text}")
+#             break
+#     else:
+#         st.error("Max retries reached. Unable to process the request.")
+#         return None
+
+# # Example usage
+# audio_url = text2speech("Hello, world!")
+# print("Audio uploaded to:", audio_url)

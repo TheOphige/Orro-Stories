@@ -6,6 +6,9 @@ from openai import OpenAI
 import requests
 import os
 import time
+import cloudinary
+import cloudinary.uploader
+import io
 import streamlit as st
 
 # from dotenv import find_dotenv, load_dotenv
@@ -15,11 +18,17 @@ import streamlit as st
 # IMGUR_CLIENT_ID = os.getenv("IMGUR_CLIENT_ID")
 # OPENROUTER_API_KEY = os.getenv("OPENROUTER_API_KEY")
 # HUGGINGFACEHUB_API_TOKEN = os.getenv("HUGGINGFACEHUB_API_TOKEN")
+# CLOUDINARY_NAME = os.getenv("CLOUDINARY_NAME")
+# CLOUDINARY_API_KEY = os.getenv("CLOUDINARY_API_KEY")
+# CLOUDINARY_API_SECRET = os.getenv("CLOUDINARY_API_SECRET")
 
 # Retrieve API keys from secrets
 IMGUR_CLIENT_ID = st.secrets["IMGUR_CLIENT_ID"]
 OPENROUTER_API_KEY = st.secrets["OPENROUTER_API_KEY"]
 HUGGINGFACEHUB_API_TOKEN = st.secrets["HUGGINGFACEHUB_API_TOKEN"]
+CLOUDINARY_NAME = st.secrets["CLOUDINARY_NAME"]
+CLOUDINARY_API_KEY = st.secrets["CLOUDINARY_API_KEY"]
+CLOUDINARY_API_SECRET = st.secrets["CLOUDINARY_API_SECRET"]
 
 # upload image to cloud
 def upload_to_imgur(image):
@@ -111,6 +120,13 @@ def generate_story(scenario):
 
 # text to speech
 def text2speech(message, max_retries=5, retry_delay=10):
+    # Initialize Cloudinary
+    cloudinary.config(
+        cloud_name=CLOUDINARY_NAME,
+        api_key=CLOUDINARY_API_KEY,
+        api_secret=CLOUDINARY_API_SECRET
+    )
+
     API_URL = "https://api-inference.huggingface.co/models/facebook/fastspeech2-en-ljspeech"
     headers = {"Authorization": f"Bearer {HUGGINGFACEHUB_API_TOKEN}"}
     payloads = {"inputs": message}
@@ -124,10 +140,22 @@ def text2speech(message, max_retries=5, retry_delay=10):
             print(f"Content-Type: {content_type}")
 
             if 'audio/flac' in content_type:
-                with open('audio.flac', 'wb') as file:
-                    file.write(response.content)
-                print("Audio file saved successfully.")
-                break
+                # Prepare the audio file for uploading
+                audio_data = io.BytesIO(response.content)
+                audio_data.seek(0)  # Reset file pointer to the start
+                
+                # Upload to Cloudinary with the proper resource type
+                upload_response = cloudinary.uploader.upload(
+                    audio_data,
+                    resource_type='raw',  # 'raw' should be used for generic files like audio
+                    public_id="generated_audio",
+                    format="flac"  # Ensuring it's uploaded as an audio file
+                )
+                
+                # Retrieve the URL for the uploaded audio
+                audio_url = upload_response.get('url')
+                print("Audio file uploaded successfully.")
+                return audio_url
 
         elif response.status_code == 503:
             # Model is loading, wait for the estimated time
@@ -147,6 +175,8 @@ def text2speech(message, max_retries=5, retry_delay=10):
             break
     else:
         st.error("Max retries reached. Unable to process the request.")
+        return None
+
 
 
 # streamlit gui
