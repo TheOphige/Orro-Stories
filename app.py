@@ -106,7 +106,7 @@ def generate_story(scenario):
     llm = ChatOpenAI(
     openai_api_key=os.getenv("OPENROUTER_API_KEY"),
     openai_api_base=os.getenv("OPENROUTER_BASE_URL"),
-    model_name="mattshumer/reflection-70b:free",
+    model_name="mistralai/pixtral-12b:free",
     )
 
     story_llm = LLMChain(llm=llm,
