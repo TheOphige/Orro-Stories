@@ -5,7 +5,7 @@ from langchain.chains import LLMChain
 from openai import OpenAI
 import requests
 import os
-import time
+from gtts import gTTS
 import cloudinary
 import cloudinary.uploader
 import io
@@ -117,14 +117,6 @@ def generate_story(scenario):
 
     return story
 
-
-# text to speech
-from gtts import gTTS
-import cloudinary
-import cloudinary.uploader
-import io
-import time
-import streamlit as st
 
 # text to speech
 def text2speech(message, lang="en-us", slow=False):
