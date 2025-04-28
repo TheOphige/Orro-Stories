@@ -1,4 +1,4 @@
-from langchain.chat_models import ChatOpenAI
+from langchain_community.chat_models import ChatOpenAI
 from langchain.prompts import PromptTemplate
 from langchain.chains import LLMChain
 
@@ -11,8 +11,8 @@ import cloudinary.uploader
 import io
 import streamlit as st
 
-# from dotenv import find_dotenv, load_dotenv
-# load_dotenv(find_dotenv())
+from dotenv import find_dotenv, load_dotenv
+load_dotenv(find_dotenv())
 
 # Retrieve API keys from .env
 # IMGUR_CLIENT_ID = os.getenv("IMGUR_CLIENT_ID")
@@ -51,9 +51,9 @@ def upload_to_imgur(image):
 ## img2text 
 def img2text(image_url):
     """Use OpenRouter's API to process the image and return the description."""
-    if not OPENROUTER_API_KEY:
-        st.error("API Key not found. Make sure OPENROUTER_API_KEY is set in your environment.")
-        return
+    # if not OPENROUTER_API_KEY:
+    #     st.error("API Key not found. Make sure OPENROUTER_API_KEY is set in your environment.")
+    #     return
 
     client = OpenAI(
         base_url="https://openrouter.ai/api/v1",
@@ -106,7 +106,7 @@ def generate_story(scenario):
     llm = ChatOpenAI(
     openai_api_key=os.getenv("OPENROUTER_API_KEY"),
     openai_api_base=os.getenv("OPENROUTER_BASE_URL"),
-    model_name="mistralai/pixtral-12b:free",
+    model_name="microsoft/mai-ds-r1:free",
     )
 
     story_llm = LLMChain(llm=llm,
@@ -119,62 +119,44 @@ def generate_story(scenario):
 
 
 # text to speech
-def text2speech(message, max_retries=5, retry_delay=10):
-    # Initialize Cloudinary
-    cloudinary.config(
-        cloud_name=CLOUDINARY_NAME,
-        api_key=CLOUDINARY_API_KEY,
-        api_secret=CLOUDINARY_API_SECRET
-    )
+from gtts import gTTS
+import cloudinary
+import cloudinary.uploader
+import io
+import time
+import streamlit as st
 
-    API_URL = "https://api-inference.huggingface.co/models/facebook/fastspeech2-en-ljspeech"
-    headers = {"Authorization": f"Bearer {HUGGINGFACEHUB_API_TOKEN}"}
-    payloads = {"inputs": message}
+# text to speech
+def text2speech(message, lang="en-us", slow=False):
+    try:
+        # Initialize Cloudinary
+        cloudinary.config(
+            cloud_name=CLOUDINARY_NAME,
+            api_key=CLOUDINARY_API_KEY,
+            api_secret=CLOUDINARY_API_SECRET
+        )
 
-    retries = 0
-    while retries < max_retries:
-        response = requests.post(API_URL, headers=headers, json=payloads)
+        # Generate speech using gTTS
+        tts = gTTS(text=message, lang=lang, slow=slow)
+        audio_data = io.BytesIO()
+        tts.write_to_fp(audio_data)
+        audio_data.seek(0)  # Reset file pointer to the start
 
-        if response.status_code == 200:
-            content_type = response.headers.get('Content-Type')
-            print(f"Content-Type: {content_type}")
+        # Upload to Cloudinary
+        upload_response = cloudinary.uploader.upload(
+            audio_data,
+            resource_type='raw',  # raw for non-image files like audio
+            public_id="generated_audio",
+            format="mp3"  # gTTS outputs MP3 format
+        )
 
-            if 'audio/flac' in content_type:
-                # Prepare the audio file for uploading
-                audio_data = io.BytesIO(response.content)
-                audio_data.seek(0)  # Reset file pointer to the start
-                
-                # Upload to Cloudinary with the proper resource type
-                upload_response = cloudinary.uploader.upload(
-                    audio_data,
-                    resource_type='raw',  # 'raw' should be used for generic files like audio
-                    public_id="generated_audio",
-                    format="flac"  # Ensuring it's uploaded as an audio file
-                )
-                
-                # Retrieve the URL for the uploaded audio
-                audio_url = upload_response.get('url')
-                print("Audio file uploaded successfully.")
-                return audio_url
+        # Retrieve the URL for the uploaded audio
+        audio_url = upload_response.get('url')
+        print("Audio file uploaded successfully.")
+        return audio_url
 
-        elif response.status_code == 503:
-            # Model is loading, wait for the estimated time
-            response_data = response.json()
-            estimated_time = response_data.get("estimated_time", retry_delay)
-            st.info(f"Model is loading. Retrying in {estimated_time} seconds...")
-            time.sleep(estimated_time)
-            retries += 1
-
-        elif response.status_code == 500 and 'Model too busy' in response.text:
-            st.info(f"Model too busy. Retrying in {retry_delay} seconds... ({retries+1}/{max_retries})")
-            retries += 1
-            time.sleep(retry_delay)
-        
-        else:
-            st.error(f"Error: {response.status_code} - {response.text}")
-            break
-    else:
-        st.error("Max retries reached. Unable to process the request.")
+    except Exception as e:
+        st.error(f"An error occurred: {e}")
         return None
 
 
@@ -197,7 +179,7 @@ def main():
         image_url = upload_to_imgur(uploaded_file)
 
         if image_url:
-            st.image(image_url, caption="Uploaded Image", use_column_width=True)
+            st.image(image_url, caption="Uploaded Image", use_container_width=True)
             
             # Generate text from the uploaded image
             with st.spinner("Generating scenario from image..."):
